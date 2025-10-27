@@ -6,11 +6,10 @@ FastAPI application for AWS AppRunner deployment
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any  # <-- Added Any
+from typing import Optional, List, Dict, Any
 import json
 import hashlib
 import time
-import os
 from datetime import datetime
 
 app = FastAPI(
@@ -35,7 +34,7 @@ class PolicyRequest(BaseModel):
     
 class ProofRequest(BaseModel):
     circuit_id: str
-    witness_data: Dict[str, Any]  # <-- Fixed: Any (not `any`)
+    witness_data: Dict[str, Any]
     engine: Optional[str] = "auto"
 
 class CircuitResponse(BaseModel):
@@ -58,8 +57,8 @@ class ProofResponse(BaseModel):
     status: str
 
 # In-memory storage (replace with DynamoDB in production)
-circuits_db: Dict[str, Dict[str, Any]] = {}
-proofs_db: Dict[str, Dict[str, Any]] = {}
+circuits_db = {}
+proofs_db = {}
 
 # Mock ZKP Engines Configuration
 ZKP_ENGINES = {
@@ -188,22 +187,41 @@ async def list_engines():
 async def compile_policy(request: PolicyRequest):
     """
     Compile natural language policy to ZKP circuit
+    
+    This endpoint demonstrates:
+    1. Policy parsing and analysis
+    2. Circuit complexity estimation
+    3. AI-assisted engine selection
+    4. Entropy budget calculation
     """
     try:
+        # Analyze policy complexity
         analysis = analyze_policy_complexity(request.policy_text)
+        
+        # Compile to circuit
         circuit_code = compile_policy_to_circuit(request.policy_text, analysis)
-        circuit_id = hashlib.sha256(f"{request.policy_text}{time.time()}".encode()).hexdigest()[:16]
+        
+        # Generate circuit ID
+        circuit_id = hashlib.sha256(
+            f"{request.policy_text}{time.time()}".encode()
+        ).hexdigest()[:16]
+        
+        # Create response
         response = CircuitResponse(
             circuit_id=circuit_id,
             policy_text=request.policy_text,
             compiled_circuit=circuit_code,
             recommended_engine=analysis["recommended_engine"],
-            entropy_budget=analysis["entropy_required"] / 8,  # bits -> bytes
+            entropy_budget=analysis["entropy_required"] / 8,  # Convert bits to bytes
             constraints=analysis["constraints"],
             timestamp=datetime.utcnow().isoformat()
         )
+        
+        # Store in database
         circuits_db[circuit_id] = response.dict()
+        
         return response
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Compilation error: {str(e)}")
 
@@ -211,12 +229,122 @@ async def compile_policy(request: PolicyRequest):
 async def generate_proof(request: ProofRequest):
     """
     Generate zero-knowledge proof for compiled circuit
+    
+    Demonstrates:
+    1. Witness data handling
+    2. Engine-specific proof generation
+    3. Entropy consumption tracking
+    4. Proof verification key generation
     """
     try:
+        # Check if circuit exists
         if request.circuit_id not in circuits_db:
             raise HTTPException(status_code=404, detail="Circuit not found")
         
         circuit = circuits_db[request.circuit_id]
+        
+        # Select engine
         engine = request.engine if request.engine != "auto" else circuit["recommended_engine"]
+        
         if engine not in ZKP_ENGINES:
-            raise HTTPException(status_code=400, detail=f"Unknown en_
+            raise HTTPException(status_code=400, detail=f"Unknown engine: {engine}")
+        
+        # Simulate proof generation
+        start_time = time.time()
+        
+        # Mock proof generation
+        proof_data = hashlib.sha256(
+            json.dumps({
+                "circuit": request.circuit_id,
+                "witness": request.witness_data,
+                "engine": engine,
+                "timestamp": time.time()
+            }).encode()
+        ).hexdigest()
+        
+        verification_key = hashlib.sha256(
+            f"{request.circuit_id}{engine}vk".encode()
+        ).hexdigest()
+        
+        generation_time = (time.time() - start_time) * 1000  # Convert to ms
+        
+        # Calculate entropy consumed (mock)
+        entropy_consumed = circuit["entropy_budget"] * 0.95  # 95% of budget
+        
+        # Generate proof ID
+        proof_id = hashlib.sha256(
+            f"{proof_data}{time.time()}".encode()
+        ).hexdigest()[:16]
+        
+        # Create response
+        response = ProofResponse(
+            proof_id=proof_id,
+            circuit_id=request.circuit_id,
+            engine_used=engine,
+            proof_data=proof_data,
+            verification_key=verification_key,
+            entropy_consumed=entropy_consumed,
+            generation_time_ms=generation_time,
+            status="valid"
+        )
+        
+        # Store proof
+        proofs_db[proof_id] = response.dict()
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Proof generation error: {str(e)}")
+
+@app.post("/verify/{proof_id}")
+async def verify_proof(proof_id: str):
+    """Verify a generated proof"""
+    if proof_id not in proofs_db:
+        raise HTTPException(status_code=404, detail="Proof not found")
+    
+    proof = proofs_db[proof_id]
+    
+    # Mock verification (always succeeds in demo)
+    verification_time = 2.5  # ms
+    
+    return {
+        "proof_id": proof_id,
+        "valid": True,
+        "verification_time_ms": verification_time,
+        "engine": proof["engine_used"],
+        "verified_at": datetime.utcnow().isoformat()
+    }
+
+@app.get("/circuits/{circuit_id}")
+async def get_circuit(circuit_id: str):
+    """Retrieve circuit details"""
+    if circuit_id not in circuits_db:
+        raise HTTPException(status_code=404, detail="Circuit not found")
+    
+    return circuits_db[circuit_id]
+
+@app.get("/proofs/{proof_id}")
+async def get_proof(proof_id: str):
+    """Retrieve proof details"""
+    if proof_id not in proofs_db:
+        raise HTTPException(status_code=404, detail="Proof not found")
+    
+    return proofs_db[proof_id]
+
+@app.get("/stats")
+async def get_stats():
+    """Get system statistics"""
+    return {
+        "circuits_compiled": len(circuits_db),
+        "proofs_generated": len(proofs_db),
+        "engines_available": len(ZKP_ENGINES),
+        "uptime_status": "operational"
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)
