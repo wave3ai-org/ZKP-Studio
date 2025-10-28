@@ -98,9 +98,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 ## 🏆 AWS Research Award
 
-ZKP-Studio is supported by the **Amazon Research Awards - Cybersecurity and Anti-Abuse Technologies** program.
-
-[Learn more about our research proposal](proposal/README.md)
+ZKP-Studio seeking funding from **Amazon Research Awards - Cybersecurity and Anti-Abuse Technologies** program.
 
 ---
 
