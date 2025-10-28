@@ -432,8 +432,10 @@ function App() {
       <footer className="bg-white border-t border-gray-200 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="text-center text-sm text-gray-600">
+© 2025 Southern Methodist University - Darwin Deason Institute for Cybersecurity
+          
             <p>© 2025 Southern Methodist University - Darwin Deason Institute for Cybersecurity</p>
-            <p className="mt-1">Research supported by AWS Science Research Awards Program</p>
+            <p className="mt-1">Open research project | Part of Wave 3 AI Cryptographic Research Ecosystem</p>
           </div>
         </div>
       </footer>
